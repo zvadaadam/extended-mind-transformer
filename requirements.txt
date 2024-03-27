@@ -1,0 +1,11 @@
+modal
+fire
+sentencepiece
+simple-parsing
+bitsandbytes
+scipy
+datasets
+wandb
+tensorboard
+torch
+#triton==2.2.0

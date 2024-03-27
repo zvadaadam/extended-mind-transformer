@@ -12,10 +12,11 @@ from torch import nn
 from xformers.ops.fmha import memory_efficient_attention
 from xformers.ops.fmha.attn_bias import AttentionBias, BlockDiagonalCausalMask
 
-from finetune.args import LoraArgs
-from finetune.lora import LoRALinear
-from mistral.cache import CacheView, RotatingBufferCache
-from mistral.rope import apply_rotary_emb, precompute_freqs_cis
+# from finetune.args import LoraArgs
+# from finetune.lora import LoRALinear
+
+from emt.cache import CacheView, RotatingBufferCache
+from emt.rope import apply_rotary_emb, precompute_freqs_cis
 
 
 @dataclass
@@ -33,7 +34,7 @@ class ModelArgs(Serializable):
 
     max_batch_size: int = 0
 
-    lora: LoraArgs = field(default_factory=LoraArgs)
+    #lora: LoraArgs = field(default_factory=LoraArgs)
 
 
 def repeat_kv(keys: torch.Tensor, values: torch.Tensor, repeats: int, dim: int):
@@ -42,15 +43,15 @@ def repeat_kv(keys: torch.Tensor, values: torch.Tensor, repeats: int, dim: int):
     return keys, values
 
 
-def maybe_lora_layer(args: ModelArgs) -> nn.Module:
-    if args.lora.enable:
-        MaybeLora = partial(
-            LoRALinear,
-            lora_args=args.lora,
-        )
-    else:
-        MaybeLora = nn.Linear
-    return MaybeLora
+# def maybe_lora_layer(args: ModelArgs) -> nn.Module:
+#     if args.lora.enable:
+#         MaybeLora = partial(
+#             LoRALinear,
+#             lora_args=args.lora,
+#         )
+#     else:
+#         MaybeLora = nn.Linear
+#     return MaybeLora
 
 
 class Attention(nn.Module):
@@ -66,11 +67,15 @@ class Attention(nn.Module):
 
         self.scale = self.args.head_dim**-0.5
 
-        MaybeLora = maybe_lora_layer(args)
-        self.wq = MaybeLora(args.dim, args.n_heads * args.head_dim, bias=False)
-        self.wk = MaybeLora(args.dim, args.n_kv_heads * args.head_dim, bias=False)
-        self.wv = MaybeLora(args.dim, args.n_kv_heads * args.head_dim, bias=False)
-        self.wo = MaybeLora(args.n_heads * args.head_dim, args.dim, bias=False)
+        # MaybeLora = maybe_lora_layer(args)
+        # self.wq = MaybeLora(args.dim, args.n_heads * args.head_dim, bias=False)
+        # self.wk = MaybeLora(args.dim, args.n_kv_heads * args.head_dim, bias=False)
+        # self.wv = MaybeLora(args.dim, args.n_kv_heads * args.head_dim, bias=False)
+        # self.wo = MaybeLora(args.n_heads * args.head_dim, args.dim, bias=False)
+        self.wq = nn.Linear(args.dim, args.n_heads * args.head_dim, bias=False)
+        self.wk = nn.Linear(args.dim, args.n_kv_heads * args.head_dim, bias=False)
+        self.wv = nn.Linear(args.dim, args.n_kv_heads * args.head_dim, bias=False)
+        self.wo = nn.Linear(args.n_heads * args.head_dim, args.dim, bias=False)
 
     def forward(
         self,
@@ -116,10 +121,13 @@ class FeedForward(nn.Module):
     def __init__(self, args: ModelArgs):
         super().__init__()
 
-        MaybeLora = maybe_lora_layer(args)
-        self.w1 = MaybeLora(args.dim, args.hidden_dim, bias=False)
-        self.w2 = MaybeLora(args.hidden_dim, args.dim, bias=False)
-        self.w3 = MaybeLora(args.dim, args.hidden_dim, bias=False)
+        #MaybeLora = maybe_lora_layer(args)
+        # self.w1 = MaybeLora(args.dim, args.hidden_dim, bias=False)
+        # self.w2 = MaybeLora(args.hidden_dim, args.dim, bias=False)
+        # self.w3 = MaybeLora(args.dim, args.hidden_dim, bias=False)
+        self.w1 = nn.Linear(args.dim, args.hidden_dim, bias=False)
+        self.w2 = nn.Linear(args.hidden_dim, args.dim, bias=False)
+        self.w3 = nn.Linear(args.dim, args.hidden_dim, bias=False)        
 
     def forward(self, x) -> torch.Tensor:
         return self.w2(nn.functional.silu(self.w1(x)) * self.w3(x))
